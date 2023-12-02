@@ -77,7 +77,7 @@ kvminithart()
 //   21..39 -- 9 bits of level-1 index.
 //   12..20 -- 9 bits of level-0 index.
 //    0..12 -- 12 bits of byte offset within the page.
-static pte_t *
+pte_t *
 walk(pagetable_t pagetable, uint64 va, int alloc)
 {
   if(va >= MAXVA)
@@ -99,8 +99,8 @@ walk(pagetable_t pagetable, uint64 va, int alloc)
 
 int
 mapNonexistentPage (pagetable_t pagetable, uint64 va) {
-    if (walk(pagetable, va, 0) != 0)
-      return 0;
+    //if (walk(pagetable, va, 0) != 0)
+    //  return 0;
 
     if (va >= myproc()->sz)
       return -1;
@@ -128,11 +128,11 @@ walkaddr(pagetable_t pagetable, uint64 va, int mode)
   pte_t *pte;
   uint64 pa;
 
-  if (mode && mapNonexistentPage(pagetable, va) != 0)
-    return 0;
+  //if (mode && mapNonexistentPage(pagetable, va) != 0)
+  //  return 0;
   pte = walk(pagetable, va, 0);
   if(pte == 0) {
-    printf("should not run\n");
+    //printf("should not run\n");
     return 0;
   }
   if((*pte & PTE_V) == 0)
@@ -420,9 +420,16 @@ copyout(pagetable_t pagetable, uint64 dstva, char *src, uint64 len)
 
   while(len > 0){
     va0 = (uint)PGROUNDDOWN(dstva);
+    //pa0 = walkaddr(pagetable, va0, 1);
+    //if(pa0 == 0)
+    //  return -1;
     pa0 = walkaddr(pagetable, va0, 1);
-    if(pa0 == 0)
-      return -1;
+    if(pa0 == 0) {
+      if(walk(pagetable, va0, 0) != 0 || mapNonexistentPage(pagetable, va0) != 0)
+        return -1;
+      else
+        pa0 = walkaddr(pagetable, va0, 1);
+    }
     n = PGSIZE - (dstva - va0);
     if(n > len)
       n = len;
@@ -445,16 +452,16 @@ copyin(pagetable_t pagetable, char *dst, uint64 srcva, uint64 len)
 
   while(len > 0){
     va0 = (uint)PGROUNDDOWN(srcva);
+    //pa0 = walkaddr(pagetable, va0, 1);
+    //if(pa0 == 0)
+    //  return -1;
     pa0 = walkaddr(pagetable, va0, 1);
-    if(pa0 == 0)
-      return -1;
-    //pa0 = walkaddr(pagetable, va0);
-    //if(pa0 == 0) {
-    //  if(mapNonexistentPage(pagetable, va0) != 0)
-    //    return -1;
-    //  else
-    //    pa0 = walkaddr(pagetable, va0);
-    //}
+    if(pa0 == 0) {
+      if(walk(pagetable, va0, 0) != 0 || mapNonexistentPage(pagetable, va0) != 0)
+        return -1;
+      else
+        pa0 = walkaddr(pagetable, va0, 1);
+    }
     n = PGSIZE - (srcva - va0);
     if(n > len)
       n = len;
@@ -479,9 +486,16 @@ copyinstr(pagetable_t pagetable, char *dst, uint64 srcva, uint64 max)
 
   while(got_null == 0 && max > 0){
     va0 = (uint)PGROUNDDOWN(srcva);
+    //pa0 = walkaddr(pagetable, va0, 1);
+    //if(pa0 == 0)
+    //  return -1;
     pa0 = walkaddr(pagetable, va0, 1);
-    if(pa0 == 0)
-      return -1;
+    if(pa0 == 0) {
+      if(walk(pagetable, va0, 0) != 0 || mapNonexistentPage(pagetable, va0) != 0)
+        return -1;
+      else
+        pa0 = walkaddr(pagetable, va0, 1);
+    }
     n = PGSIZE - (srcva - va0);
     if(n > max)
       n = max;

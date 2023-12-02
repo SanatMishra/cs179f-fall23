@@ -121,6 +121,7 @@ panic(char *s)
   printf("panic: ");
   printf(s);
   printf("\n");
+  printf("%p %p\n", r_sp(), myproc()->sz);
   panicked = 1; // freeze other CPUs
   for(;;)
     ;

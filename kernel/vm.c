@@ -5,6 +5,8 @@
 #include "riscv.h"
 #include "defs.h"
 #include "fs.h"
+#include "spinlock.h"
+#include "proc.h"
 
 /*
  * the kernel's page table.
@@ -95,18 +97,64 @@ walk(pagetable_t pagetable, uint64 va, int alloc)
   return &pagetable[PX(0, va)];
 }
 
+int
+mapNonexistentPage (pagetable_t pagetable, uint64 va) {
+    if (walk(pagetable, va, 0) != 0)
+      return 0;
+
+    if (va >= myproc()->sz)
+      return -1;
+
+    //printf("page fault expanding %p\n", r_stval());
+    char* mem = kalloc();
+    if (mem == 0)
+      return -1;
+    memset(mem, 0, PGSIZE);
+
+    if (mappages(pagetable, PGROUNDDOWN(va), PGSIZE, (uint64)mem, PTE_W|PTE_X|PTE_R|PTE_U) != 0) {
+      kfree(mem);
+      return -1;
+    }
+
+    return 0;
+}
+
 // Look up a virtual address, return the physical address,
 // or 0 if not mapped.
 // Can only be used to look up user pages.
 uint64
-walkaddr(pagetable_t pagetable, uint64 va)
+walkaddr(pagetable_t pagetable, uint64 va, int mode)
+{
+  pte_t *pte;
+  uint64 pa;
+
+  if (mode && mapNonexistentPage(pagetable, va) != 0)
+    return 0;
+  pte = walk(pagetable, va, 0);
+  if(pte == 0) {
+    printf("should not run\n");
+    return 0;
+  }
+  if((*pte & PTE_V) == 0)
+    return 0;
+  if((*pte & PTE_U) == 0)
+    return 0;
+  pa = PTE2PA(*pte);
+  return pa;
+}
+
+uint64
+walkaddrMapNonexistent(pagetable_t pagetable, uint64 va)
 {
   pte_t *pte;
   uint64 pa;
 
   pte = walk(pagetable, va, 0);
-  if(pte == 0)
-    return 0;
+  if(pte == 0) {
+    if (mapNonexistentPage(pagetable, va) != 0)
+      return 0;
+    pte = walk(pagetable, va, 0);
+  }
   if((*pte & PTE_V) == 0)
     return 0;
   if((*pte & PTE_U) == 0)
@@ -183,12 +231,19 @@ uvmunmap(pagetable_t pagetable, uint64 va, uint64 size, int do_free)
 
   a = PGROUNDDOWN(va);
   last = PGROUNDDOWN(va + size - 1);
+  
   for(;;){
+    //if ((a & ((1L << 24) - 1)) == 0)
+    //  printf("here %p\n", a);
+    //if (a >= 0x40000000L)
+    //  printf("HERE\n");
     if((pte = walk(pagetable, a, 0)) == 0)
-      panic("uvmunmap: walk");
+      goto endl;
+      //panic("uvmunmap: walk");
     if((*pte & PTE_V) == 0){
-      printf("va=%p pte=%p\n", a, *pte);
-      panic("uvmunmap: not mapped");
+      goto endl;
+      //printf("va=%p pte=%p\n", a, *pte);
+      //panic("uvmunmap: not mapped");
     }
     if(PTE_FLAGS(*pte) == PTE_V)
       panic("uvmunmap: not a leaf");
@@ -197,6 +252,7 @@ uvmunmap(pagetable_t pagetable, uint64 va, uint64 size, int do_free)
       kfree((void*)pa);
     }
     *pte = 0;
+    endl:
     if(a == last)
       break;
     a += PGSIZE;
@@ -319,9 +375,11 @@ uvmcopy(pagetable_t old, pagetable_t new, uint64 sz)
 
   for(i = 0; i < sz; i += PGSIZE){
     if((pte = walk(old, i, 0)) == 0)
-      panic("uvmcopy: pte should exist");
+      continue;
+      //panic("uvmcopy: pte should exist");
     if((*pte & PTE_V) == 0)
-      panic("uvmcopy: page not present");
+      continue;
+      //panic("uvmcopy: page not present");
     pa = PTE2PA(*pte);
     flags = PTE_FLAGS(*pte);
     if((mem = kalloc()) == 0)
@@ -362,7 +420,7 @@ copyout(pagetable_t pagetable, uint64 dstva, char *src, uint64 len)
 
   while(len > 0){
     va0 = (uint)PGROUNDDOWN(dstva);
-    pa0 = walkaddr(pagetable, va0);
+    pa0 = walkaddr(pagetable, va0, 1);
     if(pa0 == 0)
       return -1;
     n = PGSIZE - (dstva - va0);
@@ -387,9 +445,16 @@ copyin(pagetable_t pagetable, char *dst, uint64 srcva, uint64 len)
 
   while(len > 0){
     va0 = (uint)PGROUNDDOWN(srcva);
-    pa0 = walkaddr(pagetable, va0);
+    pa0 = walkaddr(pagetable, va0, 1);
     if(pa0 == 0)
       return -1;
+    //pa0 = walkaddr(pagetable, va0);
+    //if(pa0 == 0) {
+    //  if(mapNonexistentPage(pagetable, va0) != 0)
+    //    return -1;
+    //  else
+    //    pa0 = walkaddr(pagetable, va0);
+    //}
     n = PGSIZE - (srcva - va0);
     if(n > len)
       n = len;
@@ -414,7 +479,7 @@ copyinstr(pagetable_t pagetable, char *dst, uint64 srcva, uint64 max)
 
   while(got_null == 0 && max > 0){
     va0 = (uint)PGROUNDDOWN(srcva);
-    pa0 = walkaddr(pagetable, va0);
+    pa0 = walkaddr(pagetable, va0, 1);
     if(pa0 == 0)
       return -1;
     n = PGSIZE - (srcva - va0);

@@ -20,7 +20,7 @@ exec(char *path, char **argv)
   struct proghdr ph;
   pagetable_t pagetable = 0, oldpagetable;
   struct proc *p = myproc();
-
+  
   begin_op(ROOTDEV);
 
   if((ip = namei(path)) == 0){
@@ -138,7 +138,7 @@ loadseg(pagetable_t pagetable, uint64 va, struct inode *ip, uint offset, uint sz
     panic("loadseg: va must be page aligned");
 
   for(i = 0; i < sz; i += PGSIZE){
-    pa = walkaddr(pagetable, va + i);
+    pa = walkaddr(pagetable, va + i, 0);
     if(pa == 0)
       panic("loadseg: address should exist");
     if(sz - i < PGSIZE)

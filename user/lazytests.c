@@ -21,17 +21,17 @@ sparse_memory(char *s)
     exit(1);
   }
   new_end = prev_end + REGION_SZ;
-
+  //printf("a\n");
   for (i = prev_end + PGSIZE; i < new_end; i += 64 * PGSIZE)
     *(char **)i = i;
-
+  //printf("b\n");
   for (i = prev_end + PGSIZE; i < new_end; i += 64 * PGSIZE) {
     if (*(char **)i != i) {
       printf("failed to read value from memory\n");
       exit(1);
     }
   }
-
+  //printf("c\n");
   exit(0);
 }
 
@@ -40,29 +40,36 @@ sparse_memory_unmap(char *s)
 {
   int pid;
   char *i, *prev_end, *new_end;
-
+  //printf("d\n");
   prev_end = sbrk(REGION_SZ);
   if (prev_end == (char*)0xffffffffffffffffL) {
     printf("sbrk() failed\n");
     exit(1);
   }
   new_end = prev_end + REGION_SZ;
+  //printf("e\n");
 
   for (i = prev_end + PGSIZE; i < new_end; i += PGSIZE * PGSIZE)
     *(char **)i = i;
 
+  //printf("f\n");
   for (i = prev_end + PGSIZE; i < new_end; i += PGSIZE * PGSIZE) {
+    //printf("g\n");
     pid = fork();
     if (pid < 0) {
       printf("error forking\n");
       exit(1);
     } else if (pid == 0) {
+      //printf("h\n");
       sbrk(-1L * REGION_SZ);
+      //printf("i\n");
       *(char **)i = i;
       exit(0);
     } else {
       int status;
+      //printf("j\n");
       wait(&status);
+      //printf("k\n");
       if (status == 0) {
         printf("memory not unmapped\n");
         exit(1);
@@ -106,9 +113,12 @@ run(void f(char *), char *s) {
     exit(1);
   }
   if(pid == 0) {
+    //printf("A\n");
     f(s);
+    //printf("B\n");
     exit(0);
   } else {
+    //printf("C\n");
     wait(&xstatus);
     if(xstatus != 0) 
       printf("test %s: FAILED\n", s);

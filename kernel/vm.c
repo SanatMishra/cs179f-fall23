@@ -77,7 +77,7 @@ kvminithart()
 //   21..39 -- 9 bits of level-1 index.
 //   12..20 -- 9 bits of level-0 index.
 //    0..12 -- 12 bits of byte offset within the page.
-pte_t *
+static pte_t *
 walk(pagetable_t pagetable, uint64 va, int alloc)
 {
   if(va >= MAXVA)
@@ -99,8 +99,8 @@ walk(pagetable_t pagetable, uint64 va, int alloc)
 
 int
 mapNonexistentPage (pagetable_t pagetable, uint64 va) {
-    //if (walk(pagetable, va, 0) != 0)
-    //  return 0;
+    if (walk(pagetable, va, 0) != 0)
+      return -1;
 
     if (va >= myproc()->sz)
       return -1;
@@ -425,7 +425,8 @@ copyout(pagetable_t pagetable, uint64 dstva, char *src, uint64 len)
     //  return -1;
     pa0 = walkaddr(pagetable, va0, 1);
     if(pa0 == 0) {
-      if(walk(pagetable, va0, 0) != 0 || mapNonexistentPage(pagetable, va0) != 0)
+      if(mapNonexistentPage(pagetable, va0) != 0)
+      //if(walk(pagetable, va0, 0) != 0 || mapNonexistentPage(pagetable, va0) != 0)
         return -1;
       else
         pa0 = walkaddr(pagetable, va0, 1);
@@ -457,7 +458,8 @@ copyin(pagetable_t pagetable, char *dst, uint64 srcva, uint64 len)
     //  return -1;
     pa0 = walkaddr(pagetable, va0, 1);
     if(pa0 == 0) {
-      if(walk(pagetable, va0, 0) != 0 || mapNonexistentPage(pagetable, va0) != 0)
+      //if(walk(pagetable, va0, 0) != 0 || mapNonexistentPage(pagetable, va0) != 0)
+      if(mapNonexistentPage(pagetable, va0) != 0)
         return -1;
       else
         pa0 = walkaddr(pagetable, va0, 1);
@@ -491,7 +493,8 @@ copyinstr(pagetable_t pagetable, char *dst, uint64 srcva, uint64 max)
     //  return -1;
     pa0 = walkaddr(pagetable, va0, 1);
     if(pa0 == 0) {
-      if(walk(pagetable, va0, 0) != 0 || mapNonexistentPage(pagetable, va0) != 0)
+      if(mapNonexistentPage(pagetable, va0) != 0)
+      //if(walk(pagetable, va0, 0) != 0 || mapNonexistentPage(pagetable, va0) != 0)
         return -1;
       else
         pa0 = walkaddr(pagetable, va0, 1);
